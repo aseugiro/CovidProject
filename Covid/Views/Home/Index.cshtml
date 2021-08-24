@@ -1,0 +1,142 @@
+﻿@using Kendo.Mvc.UI
+@using Kendo.Mvc.UI.Fluent
+
+@{
+    ViewBag.Title = "Home";
+}
+
+<div class="jumbotron">
+    <h3>TOP 10 COVID Cases</h3>
+</div>
+
+<div class="container">
+    <div class="row">
+
+        <div class="row">
+            <div class="col-md-4">
+                @(Html.Kendo().DropDownList()
+                    .Name("DplRegion")
+                    .DataTextField("Name")
+                    .DataValueField("Iso")
+                    .OptionLabel("Regions")
+                    .HtmlAttributes(new { @style = "width:100%;" })
+                    .DataSource(source =>
+                    {
+                    source.Read(read =>
+                    {
+                    read.Action("GetRegions", "Home");
+                    });
+                    })
+                )
+            </div>
+            <div class="col-md-2">
+                @Html.Kendo().Button().Content("Report").Name("BtnReport").Events(e => e.Click("FncReport")).HtmlAttributes(new { type = "button", style = "width:100%;" })
+            </div>
+
+        </div>
+        <div class="row" style="padding-top:15px">
+            @(Html.Kendo().Grid<Covid.Models.CaseCovid>()
+              .AutoBind(true)
+              .Name("grdReport")
+              .Columns(columns =>
+              {
+                  columns.Bound(c => c.Region.Name).Title("REGION");
+                  columns.Bound(c => c.Region.Province).Title("PROVINCE");
+
+                  columns.Bound(c => c.Confirmed).Title("CASES");
+                  columns.Bound(c => c.Deaths).Title("DEATHS");
+              })
+                .ToolBar(toolbar =>
+                {
+                    toolbar.Template(@<text>
+                                @Html.Kendo().Button().Name("BtnXml").Content("XML").Events(e => e.Click("FncExport")).HtmlAttributes( new {type = "button", param="XML"} )
+
+                                @Html.Kendo().Button().Name("BtnJson").Content("JSON").Events(e => e.Click("FncExport")).HtmlAttributes( new {type = "button", param="JSON"} )
+                                @Html.Kendo().Button().Name("BtnCsv").Content("CSV").Events(e => e.Click("FncExport")).HtmlAttributes( new {type = "button", param="CSV"} )
+
+                    </text>);
+
+                })
+                .HtmlAttributes(new { style = "width:100%" })
+                .Scrollable()
+                .Filterable(ftb => ftb.Mode(GridFilterMode.Menu)
+                .Messages(msg => msg.Clear("Limpiar")
+                .Filter("Filter")
+                .Info("Criterio a filtrar")
+                .And("Y")
+                .Or("O"))
+                .Operators(opers => opers
+                .ForString(str => str.Clear().Contains("Contiene")
+                .StartsWith("Inicia con")
+                .IsEqualTo("Igual a")
+                .IsNotEqualTo("No es igual"))
+                .ForNumber(num => num.Clear().IsEqualTo("Igual a"))
+                .ForDate(dat => dat.Clear().IsEqualTo("Igual a")))
+                )
+                .Resizable(resize => resize.Columns(true))
+                .Pageable(pageable => pageable
+                .Refresh(true)
+                .PageSizes(true)
+                .ButtonCount(20)
+                .Messages(messages => messages.Display("Mostrando items {0} al {1}. Total de items: {2}"))
+                .Messages(messages => messages.ItemsPerPage("Show items"))
+                .Messages(messages => messages.Empty("No hay Items para mostrar"))
+                )
+                .DataSource(dataSource => dataSource
+                .Ajax()
+                .Model(model =>
+                {
+                model.Id(m => m.Region.Iso);
+                })
+                .Read(read => read.Action("GetCovidCases", "Home").Data("FncParameter"))
+
+                )
+                )
+
+        </div>
+       
+    </div>
+</div> 
+
+<script>
+
+    var itemIso = null;
+    var RegionProvince = "";
+
+    function FncParameter() {
+        var strIso = $("#DplRegion").data("kendoDropDownList").value();
+        if (strIso == null || strIso=="") {
+            $("#grdReport").data("kendoGrid").showColumn(0);
+            $("#grdReport").data("kendoGrid").hideColumn(1);
+            RegionProvince="REGION"
+
+        } else {
+            $("#grdReport").data("kendoGrid").hideColumn(0);
+            $("#grdReport").data("kendoGrid").showColumn(1);
+            RegionProvince="PROVINCE"
+
+        }
+
+      return {
+            StrIso: strIso
+        }
+     }
+
+    function FncReport() {
+            $("#grdReport").data("kendoGrid").dataSource.read();
+       
+    }
+   
+    function FncExport() {
+        var param = this.element.attr("param");
+        var grid = $("#grdReport").data("kendoGrid").dataSource.data();
+        var griddata = JSON.stringify(grid)
+        
+        $.post('@Url.Action("FncExport", "Home")', { Lst: griddata, TypeExport: param, TypeSearch: RegionProvince }, function (result) {
+        
+            window.location.href='@Url.Action("DownloadFile", "Home")'
+        });
+    }
+
+
+</script>
